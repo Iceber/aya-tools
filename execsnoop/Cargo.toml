@@ -1,0 +1,24 @@
+[workspace]
+members = ["ebpf", "common", "xtask"]
+
+[package]
+name = "execsnoop"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dashmap = "5.4.0"
+common = { path="./common" }
+aya = { git = "https://github.com/aya-rs/aya", branch = "main" , features=["async_tokio"]}
+aya-log = { git = "https://github.com/aya-rs/aya", branch = "main" }
+bytes = "1.0.1"
+log = "0.4"
+env_logger = "0.10.0"
+tokio = { version = "1.25", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
+anyhow = "1"
+
+[[bin]]
+name = "execsnoop"
+path = "src/main.rs"
