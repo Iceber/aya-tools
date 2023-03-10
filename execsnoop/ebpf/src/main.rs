@@ -4,7 +4,7 @@
 use aya_bpf::{
     helpers::{
         bpf_get_current_comm, bpf_get_current_pid_tgid, bpf_get_current_task,
-        bpf_get_current_uid_gid, bpf_probe_read, bpf_probe_read_kernel, bpf_probe_read_user,
+        bpf_get_current_uid_gid, bpf_probe_read_kernel, bpf_probe_read_user,
         bpf_probe_read_user_str_bytes,
     },
     macros::{kprobe, kretprobe, map},
@@ -13,7 +13,7 @@ use aya_bpf::{
     PtRegs,
 };
 
-//use aya_log_ebpf::debug;
+use aya_log_ebpf::error;
 
 use common::{Data, EventType, ARG_SIZE};
 
@@ -104,8 +104,6 @@ pub fn do_ret_sys_execve(ctx: ProbeContext) -> u32 {
     }
 }
 unsafe fn try_ret_sys_execve(ctx: ProbeContext) -> Result<u32, u32> {
-    let regs = PtRegs::new(ctx.arg(0).ok_or(1u32)?);
-
     let data = SCRATCH.get_ptr_mut(0).ok_or(1u32)?;
     (*data).pid = bpf_get_current_pid_tgid() as u32;
     (*data).uid = bpf_get_current_uid_gid() as u32;
@@ -116,14 +114,10 @@ unsafe fn try_ret_sys_execve(ctx: ProbeContext) -> Result<u32, u32> {
     let parent = bpf_probe_read_kernel(&(*task).real_parent).map_err(|_| 1u32)?;
     (*data).ppid = bpf_probe_read_kernel(&(*parent).tgid).map_err(|_| 1u32)? as u32;
 
-    match regs.ret::<*const i32>() {
-        None => (),
-        Some(p) => match bpf_probe_read(p) {
-            Err(_) => (),
-            Ok(i) => (*data).retval = i,
-        },
-    }
-
+    (*data).retval = ctx.ret().unwrap_or_else(|| {
+        error!(&ctx, "PID[{}]: get ret failed", (*data).pid);
+        0
+    });
     EVENTS.output(&ctx, &(*data), 0);
     Ok(0)
 }
